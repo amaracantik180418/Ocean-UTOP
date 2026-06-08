@@ -913,3 +913,64 @@ contract OceanUTOP is UtopReentrancyShell {
     }
 
     // ── abyss treasury ────────────────────────────────────────────────────────
+
+    function topAbyssTreasury() external payable whenPhoticActive {
+        if (msg.value == 0) revert UTOP__WithdrawZero();
+        abyssBalance += msg.value;
+        emit AbyssTreasuryTopped(msg.value, msg.sender, abyssBalance);
+    }
+
+    function withdrawAbyss(uint256 amountWei, address payable to) external onlyTideGovernor utopNonReentrant {
+        if (to == address(0)) revert UTOP__ZeroAddress();
+        if (amountWei == 0) revert UTOP__WithdrawZero();
+        if (amountWei > abyssBalance) revert UTOP__InsufficientAbyssFee();
+
+        abyssBalance -= amountWei;
+        (bool ok, ) = to.call{value: amountWei}("");
+        if (!ok) revert UTOP__TransferFailed();
+        emit AbyssTreasuryWithdrawn(to, amountWei, block.number);
+    }
+
+    function rescueERC20(address token, address to, uint256 amount) external onlyTideGovernor utopNonReentrant {
+        if (token == address(0) || to == address(0)) revert UTOP__ZeroAddress();
+        if (uint160(token) <= uint160(0x9)) revert UTOP__BadAsset();
+        if (amount == 0) revert UTOP__WithdrawZero();
+        bool ok = IERC20Minimal(token).transfer(to, amount);
+        if (!ok) revert UTOP__TokenPullFailed();
+        emit TokenRescue(token, to, amount);
+    }
+
+    // ── internal helpers ──────────────────────────────────────────────────────
+
+    function _requireLiveCurrent(bytes32 currentId) internal view {
+        CurrentLane storage lane = _currents[currentId];
+        if (lane.registrar == address(0)) revert UTOP__CurrentUnknown();
+        if (!lane.live) revert UTOP__CurrentUnknown();
+        if (!UtopCodec.unpackArmed(lane.meta)) revert UTOP__StrataNotArmed();
+    }
+
+    // ── photic tier registry ──────────────────────────────────────────────────
+
+    function registerPhoticTier(
+        uint8 tierId,
+        uint32 minDepth,
+        uint32 maxDepth
+    ) external onlyTideGovernor whenPhoticActive {
+        if (tierId == 0 || tierId > MAX_PHOTIC_TIERS) revert UTOP__TierUnknown();
+        if (minDepth == 0 || maxDepth < minDepth || maxDepth > MAX_DEPTH) revert UTOP__DepthOutOfRange();
+        PhoticTier storage tier = _photicTiers[tierId];
+        if (tier.registered && !tier.frozen) revert UTOP__TierUnknown();
+        tier.tierId = tierId;
+        tier.minDepth = minDepth;
+        tier.maxDepth = maxDepth;
+        tier.frozen = false;
+        tier.registered = true;
+        if (tierId > _tierCount) {
+            _tierCount = tierId;
+        }
+        emit PhoticTierRegistered(tierId, minDepth, maxDepth, msg.sender);
+    }
+
+    function freezePhoticTier(uint8 tierId) external onlyPhoticSentinel {
+        PhoticTier storage tier = _photicTiers[tierId];
+        if (!tier.registered) revert UTOP__TierUnknown();
