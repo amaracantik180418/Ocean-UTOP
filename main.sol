@@ -1035,3 +1035,64 @@ contract OceanUTOP is UtopReentrancyShell {
     // ── kelp batch extensions ─────────────────────────────────────────────────
 
     function appendKelpLeavesBatch(
+        bytes32 kelpId,
+        bytes32[] calldata leaves
+    ) external onlyKelpSteward whenPhoticActive {
+        uint256 len = leaves.length;
+        if (len == 0 || len > MAX_KELP_BATCH_APPEND) revert UTOP__BatchTooLarge();
+        KelpBatch storage batch = _kelpBatches[kelpId];
+        if (batch.steward == address(0)) revert UTOP__KelpBatchOpen();
+        if (batch.sealed) revert UTOP__KelpBatchSealed();
+        if (batch.leafCount + len > KELP_LEAF_CAP) revert UTOP__KelpLeafCap();
+
+        for (uint256 i = 0; i < len; i++) {
+            bytes32 leaf = leaves[i];
+            if (leaf == bytes32(0)) revert UTOP__ZeroEchoHash();
+            _kelpLeaves[kelpId].push(leaf);
+        }
+        unchecked {
+            batch.leafCount += len;
+        }
+        emit KelpLeavesBatchAppended(kelpId, len, batch.leafCount);
+    }
+
+    function sealKelpBatchWithLeaves(
+        bytes32 kelpId,
+        bytes32[] calldata expectedLeaves
+    ) external onlyKelpSteward whenPhoticActive {
+        KelpBatch storage batch = _kelpBatches[kelpId];
+        if (batch.steward == address(0)) revert UTOP__KelpBatchOpen();
+        if (batch.sealed) revert UTOP__KelpBatchSealed();
+
+        bytes32[] storage stored = _kelpLeaves[kelpId];
+        if (stored.length != expectedLeaves.length) revert UTOP__KelpLeavesMismatch();
+        for (uint256 i = 0; i < stored.length; i++) {
+            if (stored[i] != expectedLeaves[i]) revert UTOP__KelpLeavesMismatch();
+        }
+
+        bytes32 root;
+        if (stored.length == 0) {
+            root = UTOP_MERKLE_NULL;
+        } else {
+            bytes32[] memory copy = new bytes32[](stored.length);
+            for (uint256 j = 0; j < stored.length; j++) {
+                copy[j] = stored[j];
+            }
+            root = UtopMerkle.computeRoot(copy);
+        }
+        batch.merkleRoot = root;
+        batch.sealed = true;
+        emit KelpBatchSealed(kelpId, root, stored.length, block.number);
+    }
+
+    // ── plankton batch ────────────────────────────────────────────────────────
+
+    function attestPlanktonBatch(
+        bytes32[] calldata planktonIds,
+        uint32[] calldata depths,
+        uint32[] calldata salinities,
+        uint16[] calldata channels,
+        uint64 tideEpoch
+    ) external payable whenPhoticActive utopNonReentrant returns (uint256[] memory scores) {
+        uint256 len = planktonIds.length;
+        if (len == 0 || len > MAX_PLANKTON_BATCH) revert UTOP__PlanktonBatchEmpty();
