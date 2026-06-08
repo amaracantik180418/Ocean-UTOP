@@ -974,3 +974,64 @@ contract OceanUTOP is UtopReentrancyShell {
     function freezePhoticTier(uint8 tierId) external onlyPhoticSentinel {
         PhoticTier storage tier = _photicTiers[tierId];
         if (!tier.registered) revert UTOP__TierUnknown();
+        tier.frozen = true;
+        emit PhoticTierFrozen(tierId, msg.sender);
+    }
+
+    function getPhoticTier(uint8 tierId) external view returns (PhoticTier memory) {
+        return _photicTiers[tierId];
+    }
+
+    function depthFitsTier(uint8 tierId, uint32 depth) external view returns (bool) {
+        PhoticTier storage tier = _photicTiers[tierId];
+        if (!tier.registered || tier.frozen) return false;
+        return depth >= tier.minDepth && depth <= tier.maxDepth;
+    }
+
+    // ── undercurrent memos ────────────────────────────────────────────────────
+
+    function anchorUndercurrentMemo(
+        bytes32 currentId,
+        bytes32 memoHash,
+        uint64 tideEpoch
+    ) external whenPhoticActive returns (bytes32 memoId) {
+        if (memoHash == bytes32(0)) revert UTOP__ZeroEchoHash();
+        _requireLiveCurrent(currentId);
+        _requireDiver(msg.sender);
+        _requireEpochCurrent(tideEpoch);
+        if (_undercurrentCount[currentId] >= UNDERCURRENT_CAP) revert UTOP__UndercurrentCap();
+
+        memoId = UtopCodec.undercurrentMemo(currentId, memoHash, tideEpoch);
+        if (_memos[memoId].author != address(0)) revert UTOP__MemoAlreadyAnchored();
+
+        _memos[memoId] = UndercurrentMemo({
+            memoId: memoId,
+            currentId: currentId,
+            memoHash: memoHash,
+            author: msg.sender,
+            tideEpoch: tideEpoch,
+            anchoredAtBlock: block.number
+        });
+        _memoIdList.push(memoId);
+        unchecked {
+            _undercurrentCount[currentId]++;
+        }
+        diverLastAction[msg.sender] = block.number;
+        emit UndercurrentMemoAnchored(memoId, currentId, msg.sender, tideEpoch);
+    }
+
+    function getUndercurrentMemo(bytes32 memoId) external view returns (UndercurrentMemo memory) {
+        return _memos[memoId];
+    }
+
+    function memoListLength() external view returns (uint256) {
+        return _memoIdList.length;
+    }
+
+    function memoAtIndex(uint256 index) external view returns (bytes32) {
+        return _memoIdList[index];
+    }
+
+    // ── kelp batch extensions ─────────────────────────────────────────────────
+
+    function appendKelpLeavesBatch(
