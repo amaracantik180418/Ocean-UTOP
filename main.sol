@@ -303,3 +303,64 @@ contract OceanUTOP is UtopReentrancyShell {
     error UTOP__SnapshotRingFull();
 
     // ── events ───────────────────────────────────────────────────────────────
+    event PhoticStrataArmed(bool armed, uint256 atBlock);
+    event CurrentRegistered(
+        bytes32 indexed currentId,
+        string slug,
+        uint32 depth,
+        uint32 salinity,
+        uint16 channel,
+        address indexed registrar
+    );
+    event CurrentDisarmed(bytes32 indexed currentId, address indexed by, uint256 atBlock);
+    event EchoLogged(
+        bytes32 indexed currentId,
+        bytes32 indexed echoHash,
+        address indexed diver,
+        uint64 tideEpoch,
+        uint64 pulseSeq,
+        uint256 atBlock
+    );
+    event KelpBatchOpened(bytes32 indexed kelpId, uint64 tideEpoch, address indexed steward, uint256 atBlock);
+    event KelpLeafAppended(bytes32 indexed kelpId, bytes32 leaf, uint256 leafIndex, uint256 atBlock);
+    event KelpBatchSealed(bytes32 indexed kelpId, bytes32 merkleRoot, uint256 leafCount, uint256 atBlock);
+    event PlanktonAttested(
+        bytes32 indexed planktonId,
+        address indexed witness,
+        uint32 depth,
+        uint256 score,
+        uint64 tideEpoch
+    );
+    event SonarBeaconFired(
+        bytes32 indexed beaconId,
+        address indexed relay,
+        uint8 beaconType,
+        uint64 tideEpoch,
+        uint256 atBlock
+    );
+    event AbyssTreasuryTopped(uint256 amountWei, address indexed from, uint256 newBalance);
+    event AbyssTreasuryWithdrawn(address indexed to, uint256 amountWei, uint256 atBlock);
+    event TideEpochAdvanced(uint64 indexed oldEpoch, uint64 indexed newEpoch, address indexed governor);
+    event DiverWhitelisted(address indexed diver, bool allowed, address indexed by);
+    event TokenRescue(address indexed token, address indexed to, uint256 amount);
+    event EchoBatchLogged(bytes32[] echoHashes, bytes32 indexed currentId, address indexed diver, uint64 tideEpoch);
+    event CurrentMetaUpdated(bytes32 indexed currentId, uint96 newMeta, address indexed by);
+    event UndercurrentMemoAnchored(
+        bytes32 indexed memoId,
+        bytes32 indexed currentId,
+        address indexed author,
+        uint64 tideEpoch
+    );
+    event PhoticTierRegistered(uint8 indexed tierId, uint32 minDepth, uint32 maxDepth, address indexed by);
+    event PhoticTierFrozen(uint8 indexed tierId, address indexed by);
+    event KelpLeavesBatchAppended(bytes32 indexed kelpId, uint256 count, uint256 newTotal);
+    event DiverWhitelistBatch(address[] divers, bool allowed, address indexed by);
+    event EpochSnapshotRecorded(uint64 indexed tideEpoch, bytes32 digest, uint256 atBlock);
+    event CurrentLaneRearmed(bytes32 indexed currentId, address indexed by, uint256 atBlock);
+
+    // ── constants ───────────────────────────────────────────────────────────
+    uint256 public constant TIDE_BLOCKS = 317;
+    uint256 public constant ECHOES_PER_CURRENT_CAP = 96;
+    uint256 public constant BEACONS_PER_EPOCH_CAP = 48;
+    uint256 public constant KELP_LEAF_CAP = 512;
+    uint256 public constant MAX_BATCH_ECHOES = 24;
