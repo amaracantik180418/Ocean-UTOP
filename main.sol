@@ -852,3 +852,64 @@ contract OceanUTOP is UtopReentrancyShell {
             salinity: salinity,
             channel: channel,
             score: score,
+            tideEpoch: tideEpoch
+        });
+        unchecked {
+            planktonCounter++;
+        }
+        abyssBalance += msg.value;
+        emit PlanktonAttested(planktonId, msg.sender, depth, score, tideEpoch);
+        emit AbyssTreasuryTopped(msg.value, msg.sender, abyssBalance);
+    }
+
+    function getPlankton(bytes32 planktonId) external view returns (PlanktonEntry memory) {
+        return _plankton[planktonId];
+    }
+
+    // ── sonar beacons ─────────────────────────────────────────────────────────
+
+    function fireSonarBeacon(
+        bytes32 beaconId,
+        uint8 beaconType,
+        uint64 tideEpoch
+    ) external onlySonarRelay whenPhoticActive {
+        if (beaconId == bytes32(0)) revert UTOP__ZeroCurrentId();
+        if (_beacons[beaconId].relay != address(0)) revert UTOP__EchoAlreadyLogged();
+        _requireEpochCurrent(tideEpoch);
+
+        uint256 epochKey = uint256(tideEpoch);
+        if (_epochBeaconCount[epochKey] >= BEACONS_PER_EPOCH_CAP) revert UTOP__BeaconCapPerEpoch();
+
+        _beacons[beaconId] = BeaconPulse({
+            beaconId: beaconId,
+            relay: msg.sender,
+            beaconType: beaconType,
+            tideEpoch: tideEpoch,
+            firedAtBlock: block.number
+        });
+        unchecked {
+            _epochBeaconCount[epochKey]++;
+            beaconCounter++;
+        }
+        emit SonarBeaconFired(beaconId, msg.sender, beaconType, tideEpoch, block.number);
+    }
+
+    function getBeacon(bytes32 beaconId) external view returns (BeaconPulse memory) {
+        return _beacons[beaconId];
+    }
+
+    // ── diver whitelist ───────────────────────────────────────────────────────
+
+    function setDiverWhitelist(address diver, bool allowed) external onlyTideGovernor {
+        if (diver == address(0)) revert UTOP__ZeroAddress();
+        diverWhitelist[diver] = allowed;
+        emit DiverWhitelisted(diver, allowed, msg.sender);
+    }
+
+    function _requireDiver(address diver) internal view {
+        if (!diverWhitelist[diver]) revert UTOP__UnauthorizedDiver();
+        uint256 last = diverLastAction[diver];
+        if (last != 0 && block.number < last + COOLDOWN_BLOCKS) revert UTOP__CooldownActive();
+    }
+
+    // ── abyss treasury ────────────────────────────────────────────────────────
