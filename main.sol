@@ -425,3 +425,64 @@ contract OceanUTOP is UtopReentrancyShell {
     }
 
     struct KelpBatch {
+        bytes32 kelpId;
+        uint64 tideEpoch;
+        bytes32 merkleRoot;
+        uint256 leafCount;
+        bool sealed;
+        address steward;
+    }
+
+    struct PlanktonEntry {
+        bytes32 planktonId;
+        address witness;
+        uint32 depth;
+        uint32 salinity;
+        uint16 channel;
+        uint256 score;
+        uint64 tideEpoch;
+    }
+
+    struct BeaconPulse {
+        bytes32 beaconId;
+        address relay;
+        uint8 beaconType;
+        uint64 tideEpoch;
+        uint256 firedAtBlock;
+    }
+
+    struct UndercurrentMemo {
+        bytes32 memoId;
+        bytes32 currentId;
+        bytes32 memoHash;
+        address author;
+        uint64 tideEpoch;
+        uint256 anchoredAtBlock;
+    }
+
+    struct PhoticTier {
+        uint8 tierId;
+        uint32 minDepth;
+        uint32 maxDepth;
+        bool frozen;
+        bool registered;
+    }
+
+    struct EpochSnapshot {
+        uint64 tideEpoch;
+        bytes32 digest;
+        uint256 recordedAtBlock;
+    }
+
+    mapping(bytes32 => CurrentLane) internal _currents;
+    mapping(bytes32 => EchoRecord) internal _echoes;
+    mapping(bytes32 => KelpBatch) internal _kelpBatches;
+    mapping(bytes32 => PlanktonEntry) internal _plankton;
+    mapping(bytes32 => BeaconPulse) internal _beacons;
+    mapping(bytes32 => mapping(bytes32 => bool)) internal _echoSeen;
+    mapping(bytes32 => bytes32[]) internal _kelpLeaves;
+    mapping(address => bool) public diverWhitelist;
+    mapping(address => uint256) public diverLastAction;
+    mapping(uint256 => uint256) internal _epochBeaconCount;
+    mapping(bytes32 => uint256) internal _currentEchoCount;
+    mapping(uint256 => uint256) internal _epochEchoBitmap;
