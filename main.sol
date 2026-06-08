@@ -669,3 +669,64 @@ contract OceanUTOP is UtopReentrancyShell {
         if (_currentEchoCount[currentId] >= ECHOES_PER_CURRENT_CAP) revert UTOP__EchoCapPerCurrent();
 
         _echoSeen[currentId][echoHash] = true;
+        _echoes[echoHash] = EchoRecord({
+            echoHash: echoHash,
+            diver: msg.sender,
+            tideEpoch: tideEpoch,
+            pulseSeq: pulseSeq,
+            loggedAtBlock: block.number
+        });
+
+        CurrentLane storage lane = _currents[currentId];
+        unchecked {
+            lane.echoCount++;
+            echoCounter++;
+            _currentEchoCount[currentId]++;
+        }
+        diverLastAction[msg.sender] = block.number;
+
+        emit EchoLogged(currentId, echoHash, msg.sender, tideEpoch, pulseSeq, block.number);
+
+        if (address(sonarSink) != address(0)) {
+            try sonarSink.onSonarPulse(currentId, echoHash, msg.sender, tideEpoch, pulseSeq) {} catch {
+                revert UTOP__SonarSinkReject();
+            }
+        }
+    }
+
+    function logEchoBatch(
+        bytes32 currentId,
+        bytes32[] calldata payloadHashes,
+        uint64 tideEpoch,
+        uint64 basePulseSeq
+    ) external whenPhoticActive utopNonReentrant returns (bytes32[] memory echoHashes) {
+        uint256 len = payloadHashes.length;
+        if (len == 0 || len > MAX_BATCH_ECHOES) revert UTOP__BatchTooLarge();
+        _requireLiveCurrent(currentId);
+        _requireDiver(msg.sender);
+        _requireEpochCurrent(tideEpoch);
+
+        echoHashes = new bytes32[](len);
+        for (uint256 i = 0; i < len; i++) {
+            bytes32 payloadHash = payloadHashes[i];
+            if (payloadHash == bytes32(0)) revert UTOP__ZeroEchoHash();
+            uint64 pulseSeq;
+            unchecked {
+                pulseSeq = basePulseSeq + uint64(i);
+            }
+            bytes32 echoHash = UtopCodec.echoDigest(
+                currentId, payloadHash, msg.sender, tideEpoch, pulseSeq, uint64(block.timestamp)
+            );
+            if (_echoSeen[currentId][echoHash]) revert UTOP__EchoAlreadyLogged();
+            if (_currentEchoCount[currentId] >= ECHOES_PER_CURRENT_CAP) revert UTOP__EchoCapPerCurrent();
+
+            _echoSeen[currentId][echoHash] = true;
+            _echoes[echoHash] = EchoRecord({
+                echoHash: echoHash,
+                diver: msg.sender,
+                tideEpoch: tideEpoch,
+                pulseSeq: pulseSeq,
+                loggedAtBlock: block.number
+            });
+            echoHashes[i] = echoHash;
+            unchecked {
