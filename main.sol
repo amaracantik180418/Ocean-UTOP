@@ -791,3 +791,64 @@ contract OceanUTOP is UtopReentrancyShell {
         if (len == 0) {
             root = UTOP_MERKLE_NULL;
         } else {
+            bytes32[] memory copy = new bytes32[](len);
+            for (uint256 i = 0; i < len; i++) {
+                copy[i] = leaves[i];
+            }
+            root = UtopMerkle.computeRoot(copy);
+        }
+        batch.merkleRoot = root;
+        batch.sealed = true;
+        emit KelpBatchSealed(kelpId, root, len, block.number);
+    }
+
+    function verifyKelpInclusion(
+        bytes32 kelpId,
+        bytes32 leaf,
+        bytes32[] calldata proof,
+        uint256 index
+    ) external view returns (bool) {
+        KelpBatch storage batch = _kelpBatches[kelpId];
+        if (!batch.sealed) return false;
+        return UtopMerkle.verify(leaf, proof, batch.merkleRoot, index);
+    }
+
+    function kelpLeafAt(bytes32 kelpId, uint256 index) external view returns (bytes32) {
+        return _kelpLeaves[kelpId][index];
+    }
+
+    function getKelpBatch(bytes32 kelpId) external view returns (KelpBatch memory) {
+        return _kelpBatches[kelpId];
+    }
+
+    function kelpListLength() external view returns (uint256) {
+        return _kelpIdList.length;
+    }
+
+    // ── plankton attestations ─────────────────────────────────────────────────
+
+    function attestPlankton(
+        bytes32 planktonId,
+        uint32 depth,
+        uint32 salinity,
+        uint16 channel,
+        uint64 tideEpoch
+    ) external payable whenPhoticActive utopNonReentrant returns (uint256 score) {
+        if (planktonId == bytes32(0)) revert UTOP__ZeroPlanktonId();
+        if (_plankton[planktonId].witness != address(0)) revert UTOP__PlanktonDuplicate();
+        if (msg.value < ABYSS_FEE_WEI) revert UTOP__InsufficientAbyssFee();
+        if (depth == 0 || depth > MAX_DEPTH) revert UTOP__DepthOutOfRange();
+        if (salinity > MAX_SALINITY) revert UTOP__SalinityOutOfRange();
+        if (channel == 0 || channel > MAX_CHANNEL) revert UTOP__ChannelOutOfRange();
+        _requireEpochCurrent(tideEpoch);
+
+        score = UtopCodec.planktonScore(depth, salinity, channel);
+        if (score < MIN_PLANKTON_SCORE) revert UTOP__ScoreBelowFloor();
+
+        _plankton[planktonId] = PlanktonEntry({
+            planktonId: planktonId,
+            witness: msg.sender,
+            depth: depth,
+            salinity: salinity,
+            channel: channel,
+            score: score,
