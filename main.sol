@@ -120,3 +120,64 @@ library UtopCodec {
         return 5;
     }
 }
+
+library UtopMerkle {
+    function verify(
+        bytes32 leaf,
+        bytes32[] memory proof,
+        bytes32 root,
+        uint256 index
+    ) internal pure returns (bool) {
+        bytes32 computed = leaf;
+        uint256 ptr = proof.length;
+        while (ptr > 0) {
+            unchecked {
+                ptr--;
+            }
+            bytes32 sibling = proof[ptr];
+            if ((index & 1) == 0) {
+                computed = keccak256(abi.encodePacked(computed, sibling));
+            } else {
+                computed = keccak256(abi.encodePacked(sibling, computed));
+            }
+            index >>= 1;
+        }
+        return computed == root;
+    }
+
+    function computeRoot(bytes32[] memory leaves) internal pure returns (bytes32) {
+        uint256 len = leaves.length;
+        if (len == 0) return bytes32(0);
+        if (len == 1) return leaves[0];
+        while (len > 1) {
+            uint256 next = 0;
+            for (uint256 i = 0; i < len; i += 2) {
+                if (i + 1 < len) {
+                    leaves[next] = keccak256(abi.encodePacked(leaves[i], leaves[i + 1]));
+                } else {
+                    leaves[next] = keccak256(abi.encodePacked(leaves[i], leaves[i]));
+                }
+                unchecked {
+                    next++;
+                }
+            }
+            len = next;
+        }
+        return leaves[0];
+    }
+
+    function emptyKelpRoot() internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(bytes32(0), bytes32(0)));
+    }
+
+    function proofDepth(bytes32[] memory proof) internal pure returns (uint256) {
+        return proof.length;
+    }
+
+    function isSingleLeafRoot(bytes32 leaf, bytes32 root) internal pure returns (bool) {
+        return leaf == root;
+    }
+
+    function combinePair(bytes32 a, bytes32 b) internal pure returns (bytes32) {
+        if (uint256(a) <= uint256(b)) {
+            return keccak256(abi.encodePacked(a, b));
