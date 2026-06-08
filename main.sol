@@ -547,3 +547,64 @@ contract OceanUTOP is UtopReentrancyShell {
         if (armed && photicArmed) revert UTOP__StrataAlreadyArmed();
         photicArmed = armed;
         emit PhoticStrataArmed(armed, block.number);
+    }
+
+    function haltPhoticZone(bool halt) external onlyPhoticSentinel {
+        photicHalted = halt;
+    }
+
+    function wireSonarSink(address sink) external onlyTideGovernor {
+        if (sink == address(0)) revert UTOP__ZeroAddress();
+        sonarSink = IUTOPSonarSink(sink);
+    }
+
+    // ── tide epoch ────────────────────────────────────────────────────────────
+
+    function advanceTideEpoch() external onlyTideGovernor whenPhoticActive {
+        uint64 oldEpoch = activeTideEpoch;
+        unchecked {
+            activeTideEpoch = oldEpoch + 1;
+        }
+        emit TideEpochAdvanced(oldEpoch, activeTideEpoch, msg.sender);
+    }
+
+    function tideEpochForBlock(uint256 blockNum) public view returns (uint64) {
+        if (blockNum < genesisBlock) return 0;
+        uint256 delta = blockNum - genesisBlock;
+        return uint64(1 + (delta / TIDE_BLOCKS));
+    }
+
+    function _requireEpochCurrent(uint64 epoch) internal view {
+        uint64 computed = tideEpochForBlock(block.number);
+        if (epoch < computed - 1) revert UTOP__TideEpochStale();
+        if (epoch > computed + 1) revert UTOP__TideEpochFuture();
+    }
+
+    // ── current lane registry ─────────────────────────────────────────────────
+
+    function registerCurrent(
+        string calldata slug,
+        uint32 depth,
+        uint32 salinity,
+        uint16 channel
+    ) external onlyCurrentOracle whenPhoticActive returns (bytes32 currentId) {
+        if (!photicArmed) revert UTOP__StrataNotArmed();
+        if (depth == 0 || depth > MAX_DEPTH) revert UTOP__DepthOutOfRange();
+        if (salinity > MAX_SALINITY) revert UTOP__SalinityOutOfRange();
+        if (channel == 0 || channel > MAX_CHANNEL) revert UTOP__ChannelOutOfRange();
+
+        currentId = UtopCodec.currentKey(slug, depth);
+        if (_currents[currentId].registrar != address(0)) revert UTOP__CurrentAlreadyRegistered();
+
+        uint96 meta = UtopCodec.packCurrentMeta(depth, salinity, channel, true);
+        _currents[currentId] = CurrentLane({
+            currentId: currentId,
+            slug: slug,
+            meta: meta,
+            registrar: msg.sender,
+            openedEpoch: activeTideEpoch,
+            echoCount: 0,
+            live: true
+        });
+        _currentIdList.push(currentId);
+
