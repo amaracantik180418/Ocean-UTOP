@@ -730,3 +730,64 @@ contract OceanUTOP is UtopReentrancyShell {
             });
             echoHashes[i] = echoHash;
             unchecked {
+                _currents[currentId].echoCount++;
+                echoCounter++;
+                _currentEchoCount[currentId]++;
+            }
+        }
+        diverLastAction[msg.sender] = block.number;
+        emit EchoBatchLogged(echoHashes, currentId, msg.sender, tideEpoch);
+    }
+
+    function getEcho(bytes32 echoHash) external view returns (EchoRecord memory) {
+        return _echoes[echoHash];
+    }
+
+    function echoSeen(bytes32 currentId, bytes32 echoHash) external view returns (bool) {
+        return _echoSeen[currentId][echoHash];
+    }
+
+    // ── kelp merkle batches ───────────────────────────────────────────────────
+
+    function openKelpBatch(bytes32 kelpId, uint64 tideEpoch) external onlyKelpSteward whenPhoticActive {
+        if (kelpId == bytes32(0)) revert UTOP__ZeroKelpId();
+        if (_kelpBatches[kelpId].steward != address(0)) revert UTOP__KelpBatchOpen();
+        _requireEpochCurrent(tideEpoch);
+
+        _kelpBatches[kelpId] = KelpBatch({
+            kelpId: kelpId,
+            tideEpoch: tideEpoch,
+            merkleRoot: bytes32(0),
+            leafCount: 0,
+            sealed: false,
+            steward: msg.sender
+        });
+        _kelpIdList.push(kelpId);
+        emit KelpBatchOpened(kelpId, tideEpoch, msg.sender, block.number);
+    }
+
+    function appendKelpLeaf(bytes32 kelpId, bytes32 leaf) external onlyKelpSteward whenPhoticActive {
+        KelpBatch storage batch = _kelpBatches[kelpId];
+        if (batch.steward == address(0)) revert UTOP__KelpBatchOpen();
+        if (batch.sealed) revert UTOP__KelpBatchSealed();
+        if (batch.leafCount >= KELP_LEAF_CAP) revert UTOP__KelpLeafCap();
+        if (leaf == bytes32(0)) revert UTOP__ZeroEchoHash();
+
+        _kelpLeaves[kelpId].push(leaf);
+        unchecked {
+            batch.leafCount++;
+        }
+        emit KelpLeafAppended(kelpId, leaf, batch.leafCount - 1, block.number);
+    }
+
+    function sealKelpBatch(bytes32 kelpId) external onlyKelpSteward whenPhoticActive {
+        KelpBatch storage batch = _kelpBatches[kelpId];
+        if (batch.steward == address(0)) revert UTOP__KelpBatchOpen();
+        if (batch.sealed) revert UTOP__KelpBatchSealed();
+
+        bytes32[] storage leaves = _kelpLeaves[kelpId];
+        uint256 len = leaves.length;
+        bytes32 root;
+        if (len == 0) {
+            root = UTOP_MERKLE_NULL;
+        } else {
