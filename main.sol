@@ -486,3 +486,64 @@ contract OceanUTOP is UtopReentrancyShell {
     mapping(uint256 => uint256) internal _epochBeaconCount;
     mapping(bytes32 => uint256) internal _currentEchoCount;
     mapping(uint256 => uint256) internal _epochEchoBitmap;
+    mapping(bytes32 => UndercurrentMemo) internal _memos;
+    mapping(bytes32 => uint256) internal _undercurrentCount;
+    mapping(uint8 => PhoticTier) internal _photicTiers;
+    mapping(uint64 => EpochSnapshot) internal _epochSnapshots;
+    EpochSnapshot[SNAPSHOT_RING_SIZE] internal _snapshotRing;
+    uint256 internal _snapshotHead;
+    uint8 internal _tierCount;
+    bytes32[] internal _currentIdList;
+    bytes32[] internal _kelpIdList;
+    bytes32[] internal _memoIdList;
+
+    modifier whenPhoticActive() {
+        if (photicHalted) revert UTOP__PhoticHalted();
+        _;
+    }
+
+    modifier onlyTideGovernor() {
+        if (msg.sender != tideGovernor) revert UTOP__NotTideGovernor();
+        _;
+    }
+
+    modifier onlyCurrentOracle() {
+        if (msg.sender != currentOracle) revert UTOP__NotCurrentOracle();
+        _;
+    }
+
+    modifier onlySonarRelay() {
+        if (msg.sender != sonarRelay) revert UTOP__NotSonarRelay();
+        _;
+    }
+
+    modifier onlyKelpSteward() {
+        if (msg.sender != kelpSteward) revert UTOP__NotKelpSteward();
+        _;
+    }
+
+    modifier onlyPhoticSentinel() {
+        if (msg.sender != photicSentinel) revert UTOP__NotPhoticSentinel();
+        _;
+    }
+
+    constructor() {
+        tideGovernor = 0x462CE17e242878Ea6cE0247Ee9563A4052991066;
+        currentOracle = 0x99c0f88AE03956cB909eC7Ea5D4Dbe8EA17B4944;
+        abyssTreasury = 0x5595DADE47D878d3B412E463f54e713Ceb2F27B8;
+        sonarRelay = 0x2343f4E335585716E17C0C3c64ee84bd8fb1eB8d;
+        kelpSteward = 0x69C6feabFFa5C9f0Bf4717671Dce192CEd08aDd6;
+        photicSentinel = 0x3Af224ED18eF7B2Bd3D3E02a70E5500a78f3bB91;
+        genesisBlock = block.number;
+        deploymentSalt = keccak256(abi.encodePacked(UTOP_DOMAIN_SALT, block.chainid, block.timestamp));
+        activeTideEpoch = 1;
+        photicArmed = false;
+        photicHalted = false;
+    }
+
+    // ── photic strata control ───────────────────────────────────────────────────
+
+    function armPhoticStrata(bool armed) external onlyTideGovernor {
+        if (armed && photicArmed) revert UTOP__StrataAlreadyArmed();
+        photicArmed = armed;
+        emit PhoticStrataArmed(armed, block.number);
