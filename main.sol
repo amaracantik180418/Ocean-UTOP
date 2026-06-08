@@ -608,3 +608,64 @@ contract OceanUTOP is UtopReentrancyShell {
         });
         _currentIdList.push(currentId);
 
+        emit CurrentRegistered(currentId, slug, depth, salinity, channel, msg.sender);
+    }
+
+    function disarmCurrent(bytes32 currentId) external onlyCurrentOracle whenPhoticActive {
+        CurrentLane storage lane = _currents[currentId];
+        if (lane.registrar == address(0)) revert UTOP__CurrentUnknown();
+        lane.live = false;
+        uint96 meta = lane.meta;
+        uint32 depth = UtopCodec.unpackDepth(meta);
+        uint32 salinity = UtopCodec.unpackSalinity(meta);
+        uint16 channel = UtopCodec.unpackChannel(meta);
+        lane.meta = UtopCodec.packCurrentMeta(depth, salinity, channel, false);
+        emit CurrentDisarmed(currentId, msg.sender, block.number);
+    }
+
+    function updateCurrentMeta(
+        bytes32 currentId,
+        uint32 newSalinity,
+        uint16 newChannel
+    ) external onlyCurrentOracle whenPhoticActive {
+        CurrentLane storage lane = _currents[currentId];
+        if (lane.registrar == address(0)) revert UTOP__CurrentUnknown();
+        if (newSalinity > MAX_SALINITY) revert UTOP__SalinityOutOfRange();
+        if (newChannel == 0 || newChannel > MAX_CHANNEL) revert UTOP__ChannelOutOfRange();
+        uint32 depth = UtopCodec.unpackDepth(lane.meta);
+        bool armed = UtopCodec.unpackArmed(lane.meta);
+        lane.meta = UtopCodec.packCurrentMeta(depth, newSalinity, newChannel, armed);
+        emit CurrentMetaUpdated(currentId, lane.meta, msg.sender);
+    }
+
+    function getCurrentLane(bytes32 currentId) external view returns (CurrentLane memory) {
+        return _currents[currentId];
+    }
+
+    function currentListLength() external view returns (uint256) {
+        return _currentIdList.length;
+    }
+
+    function currentAtIndex(uint256 index) external view returns (bytes32) {
+        return _currentIdList[index];
+    }
+
+    // ── echo logging ──────────────────────────────────────────────────────────
+
+    function logEcho(
+        bytes32 currentId,
+        bytes32 payloadHash,
+        uint64 tideEpoch,
+        uint64 pulseSeq
+    ) external whenPhoticActive utopNonReentrant returns (bytes32 echoHash) {
+        if (currentId == bytes32(0)) revert UTOP__ZeroCurrentId();
+        if (payloadHash == bytes32(0)) revert UTOP__ZeroEchoHash();
+        _requireEpochCurrent(tideEpoch);
+        _requireLiveCurrent(currentId);
+        _requireDiver(msg.sender);
+
+        echoHash = UtopCodec.echoDigest(currentId, payloadHash, msg.sender, tideEpoch, pulseSeq, uint64(block.timestamp));
+        if (_echoSeen[currentId][echoHash]) revert UTOP__EchoAlreadyLogged();
+        if (_currentEchoCount[currentId] >= ECHOES_PER_CURRENT_CAP) revert UTOP__EchoCapPerCurrent();
+
+        _echoSeen[currentId][echoHash] = true;
