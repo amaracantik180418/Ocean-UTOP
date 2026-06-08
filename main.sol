@@ -364,3 +364,64 @@ contract OceanUTOP is UtopReentrancyShell {
     uint256 public constant BEACONS_PER_EPOCH_CAP = 48;
     uint256 public constant KELP_LEAF_CAP = 512;
     uint256 public constant MAX_BATCH_ECHOES = 24;
+    uint256 public constant ABYSS_FEE_WEI = 0.002 ether;
+    uint256 public constant MIN_PLANKTON_SCORE = 128;
+    uint256 public constant MAX_DEPTH = 4096;
+    uint256 public constant MAX_SALINITY = 65535;
+    uint256 public constant MAX_CHANNEL = 1024;
+    uint256 public constant COOLDOWN_BLOCKS = 13;
+    uint256 public constant MAX_DIVER_BATCH = 32;
+    uint256 public constant MAX_KELP_BATCH_APPEND = 16;
+    uint256 public constant MAX_PLANKTON_BATCH = 12;
+    uint256 public constant UNDERCURRENT_CAP = 256;
+    uint256 public constant SNAPSHOT_RING_SIZE = 64;
+    uint256 public constant MAX_PHOTIC_TIERS = 8;
+    uint256 public constant UTOP_GENESIS_SALT = 0x8F3c2A9e1D7b4E6f0C5a8B3d2F1e9A7c6E4b0D8f2;
+    bytes32 public constant UTOP_DOMAIN_SALT =
+        0xe066394b5eff32708581c2611424645ee1518377bb5353e0f7e7119a73a7d2e6;
+    bytes32 public constant UTOP_GENESIS_ANCHOR =
+        0xd40759ef85e379d7c34c0e374860e173ebdb4818107401c50ee433a6630fedc0;
+    bytes32 public constant UTOP_MERKLE_NULL =
+        0x3f53e6b01079c43ff665450f5f48afef2a12c3310112761329a021c10726d060;
+    bytes32 public constant UTOP_SONAR_SEED =
+        0x765215584d667e1a7aab84aec396502dbe58428954dd107a1ac0a0b342770473;
+
+    // ── immutable bootstrap roles ─────────────────────────────────────────────
+    address public immutable tideGovernor;
+    address public immutable currentOracle;
+    address public immutable abyssTreasury;
+    address public immutable sonarRelay;
+    address public immutable kelpSteward;
+    address public immutable photicSentinel;
+    uint256 public immutable genesisBlock;
+    bytes32 public immutable deploymentSalt;
+
+    // ── global state ────────────────────────────────────────────────────────────
+    uint64 public activeTideEpoch;
+    uint64 public echoCounter;
+    uint64 public planktonCounter;
+    uint64 public beaconCounter;
+    uint256 public abyssBalance;
+    bool public photicArmed;
+    bool public photicHalted;
+    IUTOPSonarSink public sonarSink;
+
+    struct CurrentLane {
+        bytes32 currentId;
+        string slug;
+        uint96 meta;
+        address registrar;
+        uint64 openedEpoch;
+        uint256 echoCount;
+        bool live;
+    }
+
+    struct EchoRecord {
+        bytes32 echoHash;
+        address diver;
+        uint64 tideEpoch;
+        uint64 pulseSeq;
+        uint256 loggedAtBlock;
+    }
+
+    struct KelpBatch {
