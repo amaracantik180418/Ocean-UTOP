@@ -181,3 +181,64 @@ library UtopMerkle {
     function combinePair(bytes32 a, bytes32 b) internal pure returns (bytes32) {
         if (uint256(a) <= uint256(b)) {
             return keccak256(abi.encodePacked(a, b));
+        }
+        return keccak256(abi.encodePacked(b, a));
+    }
+}
+
+library UtopSonar {
+    function encodePulse(
+        bytes32 currentId,
+        uint64 tideEpoch,
+        uint64 pulseSeq,
+        uint8 band
+    ) internal pure returns (bytes32) {
+        return keccak256(abi.encode(currentId, tideEpoch, pulseSeq, band));
+    }
+
+    function decayScore(uint256 score, uint64 epochsElapsed) internal pure returns (uint256) {
+        if (epochsElapsed == 0) return score;
+        uint256 penalty = uint256(epochsElapsed) * 3;
+        return UtopCodec.saturatingSub(score, penalty);
+    }
+
+    function beaconPriority(uint8 beaconType) internal pure returns (uint256) {
+        if (beaconType == 0) return 10;
+        if (beaconType == 1) return 25;
+        if (beaconType == 2) return 50;
+        if (beaconType == 3) return 100;
+        return 5;
+    }
+}
+
+library UtopBitmap {
+    function get(mapping(uint256 => uint256) storage map, uint256 index) internal view returns (bool) {
+        uint256 bucket = index >> 8;
+        uint256 bit = 1 << (index & 0xff);
+        return (map[bucket] & bit) != 0;
+    }
+
+    function set(mapping(uint256 => uint256) storage map, uint256 index) internal {
+        uint256 bucket = index >> 8;
+        uint256 bit = 1 << (index & 0xff);
+        map[bucket] |= bit;
+    }
+
+    function clear(mapping(uint256 => uint256) storage map, uint256 index) internal {
+        uint256 bucket = index >> 8;
+        uint256 bit = 1 << (index & 0xff);
+        map[bucket] &= ~bit;
+    }
+
+    function flip(mapping(uint256 => uint256) storage map, uint256 index) internal {
+        uint256 bucket = index >> 8;
+        uint256 bit = 1 << (index & 0xff);
+        map[bucket] ^= bit;
+    }
+}
+
+abstract contract UtopReentrancyShell {
+    uint256 private _utopGate;
+
+    modifier utopNonReentrant() {
+        if (_utopGate != 0) revert UTOP__Reentrancy();
