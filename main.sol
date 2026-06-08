@@ -242,3 +242,64 @@ abstract contract UtopReentrancyShell {
 
     modifier utopNonReentrant() {
         if (_utopGate != 0) revert UTOP__Reentrancy();
+        _utopGate = 1;
+        _;
+        _utopGate = 0;
+    }
+}
+
+contract OceanUTOP is UtopReentrancyShell {
+    // ── custom errors ────────────────────────────────────────────────────────
+    error UTOP__ZeroAddress();
+    error UTOP__ZeroCurrentId();
+    error UTOP__ZeroEchoHash();
+    error UTOP__ZeroKelpId();
+    error UTOP__ZeroPlanktonId();
+    error UTOP__PhoticHalted();
+    error UTOP__NotTideGovernor();
+    error UTOP__NotCurrentOracle();
+    error UTOP__NotSonarRelay();
+    error UTOP__NotKelpSteward();
+    error UTOP__NotPhoticSentinel();
+    error UTOP__CurrentAlreadyRegistered();
+    error UTOP__CurrentUnknown();
+    error UTOP__EchoAlreadyLogged();
+    error UTOP__KelpBatchSealed();
+    error UTOP__KelpBatchOpen();
+    error UTOP__KelpProofInvalid();
+    error UTOP__PlanktonCapReached();
+    error UTOP__PlanktonDuplicate();
+    error UTOP__TideEpochStale();
+    error UTOP__TideEpochFuture();
+    error UTOP__DepthOutOfRange();
+    error UTOP__SalinityOutOfRange();
+    error UTOP__ChannelOutOfRange();
+    error UTOP__TransferFailed();
+    error UTOP__InsufficientAbyssFee();
+    error UTOP__WithdrawZero();
+    error UTOP__BatchTooLarge();
+    error UTOP__ArrayLengthMismatch();
+    error UTOP__Reentrancy();
+    error UTOP__TokenPullFailed();
+    error UTOP__AllowanceLow();
+    error UTOP__SonarSinkReject();
+    error UTOP__StrataNotArmed();
+    error UTOP__StrataAlreadyArmed();
+    error UTOP__BeaconCapPerEpoch();
+    error UTOP__EchoCapPerCurrent();
+    error UTOP__KelpLeafCap();
+    error UTOP__BadAsset();
+    error UTOP__CooldownActive();
+    error UTOP__ScoreBelowFloor();
+    error UTOP__UnauthorizedDiver();
+    error UTOP__MemoAlreadyAnchored();
+    error UTOP__MemoUnknown();
+    error UTOP__TierUnknown();
+    error UTOP__TierFrozen();
+    error UTOP__UndercurrentCap();
+    error UTOP__DiverBatchTooLarge();
+    error UTOP__KelpLeavesMismatch();
+    error UTOP__PlanktonBatchEmpty();
+    error UTOP__SnapshotRingFull();
+
+    // ── events ───────────────────────────────────────────────────────────────
