@@ -59,3 +59,64 @@ library UtopCodec {
     function echoDigest(
         bytes32 currentId,
         bytes32 payloadHash,
+        address diver,
+        uint64 tideEpoch,
+        uint64 pulseSeq,
+        uint64 sonarAt
+    ) internal pure returns (bytes32) {
+        return keccak256(abi.encode(currentId, payloadHash, diver, tideEpoch, pulseSeq, sonarAt));
+    }
+
+    function kelpLeaf(bytes32 left, bytes32 right) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(left, right));
+    }
+
+    function clampU64(uint256 v, uint64 lo, uint64 hi) internal pure returns (uint64) {
+        if (v < lo) return lo;
+        if (v > hi) return hi;
+        return uint64(v);
+    }
+
+    function clampU32(uint256 v, uint32 lo, uint32 hi) internal pure returns (uint32) {
+        if (v < lo) return lo;
+        if (v > hi) return hi;
+        return uint32(v);
+    }
+
+    function saturatingSub(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a > b ? a - b : 0;
+    }
+
+    function planktonScore(uint32 depth, uint32 salinity, uint16 channel) internal pure returns (uint256) {
+        uint256 base = uint256(depth) * 17 + uint256(salinity) * 11 + uint256(channel) * 23;
+        return base ^ (base >> 7);
+    }
+
+    function undercurrentMemo(
+        bytes32 currentId,
+        bytes32 memoHash,
+        uint64 tideEpoch
+    ) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked("UTOP_MEMO", currentId, memoHash, tideEpoch));
+    }
+
+    function sonarBeaconKey(bytes32 seed, uint8 beaconType, uint64 tideEpoch) internal pure returns (bytes32) {
+        return keccak256(abi.encode(seed, beaconType, tideEpoch, "UTOP_BEACON"));
+    }
+
+    function kelpLeafDigest(bytes32 kelpId, bytes32 payload, uint256 index) internal pure returns (bytes32) {
+        return keccak256(abi.encode(kelpId, payload, index));
+    }
+
+    function mixSalinity(uint32 a, uint32 b) internal pure returns (uint32) {
+        return uint32((uint256(a) + uint256(b)) >> 1);
+    }
+
+    function depthBand(uint32 depth) internal pure returns (uint8) {
+        if (depth < 64) return 1;
+        if (depth < 256) return 2;
+        if (depth < 1024) return 3;
+        if (depth < 2048) return 4;
+        return 5;
+    }
+}
